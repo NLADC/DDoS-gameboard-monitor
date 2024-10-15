@@ -1,0 +1,51 @@
+---
+general:
+  socket_dir: /home/remote-controller/ark/
+  gameboard_api: https://example.com/api
+  pid: run/gbmon.pid
+  logfile: log/gbmon.log
+  loglevel: info
+controller:
+  logfile: log/gbmon-controller.log
+  loglevel: info
+database:
+  type: influxdb2
+  url: https://example.com:8087
+  org: Example
+  token: 
+  bucket: gbmon
+measurements:
+  ping:
+    targets:
+      - 1.2.3.4
+      - 4.5.6.7
+    nodes:
+      - node1.ark
+      - node2.ark
+  https_get:
+    targets:
+      - https://www.example.com/
+    nodes:
+      - node1.ark
+      - node2.ark
+  dns4:
+    targets:
+      - ns1.example.com
+      - ns2.example.com
+    nodes:
+      - node1.ark
+      - node2.ark
+  dns6:
+    targets:
+      - ns1.example.com
+      - ns2.example
+    nodes:
+      - node1.ark
+      - node2.ark
+  smtp:
+    targets:
+      - mail.example.nl
+      - mail.example.org
+    nodes:
+      - node1.ark
+      - node2.ark

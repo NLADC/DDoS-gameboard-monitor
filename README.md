@@ -40,3 +40,7 @@ Grafana runs on a separate host and is not using caida Ark. Elements are:
 * plot log lines on the graphs
 
 With plotting the log lines on the graphs you can see what effect a ddos att5ack has or the other way round, from peeks or drops in the graphs you can relate any action to this.
+
+## License
+
+GPL
