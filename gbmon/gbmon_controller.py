@@ -18,7 +18,7 @@
     
 @author: pim
 @since: 11-09-2024
-@version: 1.1
+@version: 1.1a
 '''
 import sys
 import subprocess
