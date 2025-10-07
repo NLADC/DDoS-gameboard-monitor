@@ -3,6 +3,9 @@
         
     Created on 16 September 2024
     
+    Dependencies:
+    - python3-yaml
+    
     @author: Pim van Stam
     @copyright: S3group, 2024
     @version: 1.0

@@ -64,7 +64,9 @@ def get_allnodes(socket_dir=None, mux_interface=None):
         with scamper.ScamperCtrl(mux=mux_interface) as ctrl:
             vps = ctrl.vps()          # list[ScamperVp] + metadata (name, cc, tags, ASN, etc.)
             for vp in vps:
-                print(vp.name, vp.cc, vp.tags)
+                vp_name = vp.name.split('.')
+                nodes.append(f"{vp_name[0]}.{vp_name[1]}")
+#                print(vp.name, vp.cc, vp.tags)
 
     return sorted(nodes)
 
@@ -260,11 +262,19 @@ def main():
         logger.info("API access authenticated")
 
 
+    socket_dir = None
     try:
-        socket_dir = cfg["general"]["socket_dir"]
+        mux_interface = cfg["general"]["mux_interface"]
     except:
-        logger.error("Socket directory not in configuration. Cannot continue.")
-        return 1
+        mux_interface = None
+        logger.info("Mux interface not in configuration. Preferred method over socket_dir.")
+        try:
+            socket_dir = cfg["general"]["socket_dir"]
+        except:
+            logger.error("Socket directory not in configuration. Cannot continue.")
+            return 1
+        
+    logger.debug(f"Using multiplex interface: {str(mux_interface)}; socket_dir: {str(socket_dir)}")
 
     '''
         Periodic actions are:
@@ -281,7 +291,8 @@ def main():
         '''
             Step 1: Get nodelist from Ark and PUT list to gameboard on changes
         '''
-        all_nodes = get_allnodes(socket_dir)
+        all_nodes = get_allnodes(socket_dir, mux_interface)
+        return 0
         if all_nodes != prev_nodes:
             logger.info("Node list has changed (or first run). Send list to Gameboard.")
             set_now = set(all_nodes)
@@ -352,8 +363,8 @@ def main():
 
 
 if __name__ == '__main__':
-    get_allnodes()
-    exit()
+#    get_allnodes()
+#    exit()
     main()
     gbmon_stop(cfg['general']['pid'])
     
