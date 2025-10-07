@@ -18,7 +18,7 @@
     
 @author: pim
 @since: 11-09-2024
-@version: 1.0
+@version: 1.1
 '''
 import sys
 import subprocess
@@ -31,6 +31,7 @@ from urllib.parse import urlparse
 import psutil
 import gbapi
 import gbcommon
+import scamper
 
 CONFIG_YAML = 'gbm-config.yaml'
 LOOPWAIT = 10
@@ -38,13 +39,30 @@ LOGSTDOUT = 'log/gbmon_stdout.log'
 logger = None
 cfg = None
 
-def get_allnodes(socket_dir):
+'''
+    Get all vps nodes registered at the controller.
+    Remote processes can connect and create a remote socket on the
+    controller of connect to the multiplexed interface. Both methods can be used
+    to find the active remote processes. Only one method will used at a time.
+    mux_interface has preference over socket_dir.
+    
+'''
+def get_allnodes(socket_dir=None, mux_interface=None):
     nodes = []
-    arklist = [file for file in glob.glob(f"{socket_dir}/*.ark-*")]
-    for node in arklist:
-        subs1 = node[node.rfind("/")+1:] # get past the last "/" as path divider
-        subs2 = subs1[:subs1.find("ark-")+3]
-        nodes.append(subs2)
+    
+    if mux_interface == None:
+        if socket_dir != None:
+            arklist = [file for file in glob.glob(f"{socket_dir}/*.ark-*")]
+            for node in arklist:
+                subs1 = node[node.rfind("/")+1:] # get past the last "/" as path divider
+                subs2 = subs1[:subs1.find("ark-")+3]
+                nodes.append(subs2)
+    else:
+        with scamper.ScamperCtrl(mux=mux_interface) as ctrl:
+            vps = ctrl.vps()          # list[ScamperVp] + metadata (name, cc, tags, ASN, etc.)
+            for vp in vps:
+                print(vp.name, vp.cc, vp.tags)
+
     return sorted(nodes)
 
 
@@ -331,6 +349,8 @@ def main():
 
 
 if __name__ == '__main__':
+    get_allnodes()
+    exit()
     main()
     gbmon_stop(cfg['general']['pid'])
     
