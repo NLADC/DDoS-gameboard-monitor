@@ -11,6 +11,9 @@
     - get gbmon process ID
     - SIGHUP gbmon process when config has changed
     
+    Dependency:
+    - python3-psutil
+    
     Future development:
     - start / stop gbmon process if there is an active ddos test or has ended
     - check the gbmon process to be alive and restart on crashes
@@ -18,7 +21,7 @@
     
 @author: pim
 @since: 11-09-2024
-@version: 1.1
+@version: 1.1a
 '''
 import sys
 import subprocess
@@ -29,9 +32,9 @@ import glob
 import pathlib
 from urllib.parse import urlparse
 import psutil
-import gbapi
-import gbcommon
 import scamper
+import "gbapi"
+import "gbcommon"
 
 CONFIG_YAML = 'gbm-config.yaml'
 LOOPWAIT = 10
