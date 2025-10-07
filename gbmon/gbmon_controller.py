@@ -33,8 +33,8 @@ import pathlib
 from urllib.parse import urlparse
 import psutil
 import scamper
-import "gbapi"
-import "gbcommon"
+import gbapi
+import gbcommon
 
 CONFIG_YAML = 'gbm-config.yaml'
 LOOPWAIT = 10
