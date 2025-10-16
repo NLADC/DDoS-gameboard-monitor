@@ -170,6 +170,9 @@ def get_pid(filename):
 '''
 def set_logging(logfile, level, logcount=0):
     
+    logging.getLogger("Rx").setLevel(logging.WARNING)
+    logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
+    
     log = logging.getLogger() # get root logger
     if log.hasHandlers(): # cleanup stale/existing handlers
         for loghandler in log.handlers:
@@ -181,7 +184,7 @@ def set_logging(logfile, level, logcount=0):
         loghandler = logging.handlers.TimedRotatingFileHandler(filename=logfile, when='midnight', backupCount=logcount)
     else:
         loghandler = logging.handlers.WatchedFileHandler(filename=logfile)
-    frm = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s", "%Y-%m-%d %H:%M:%S")
+    frm = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s", "%Y-%m-%d %H:%M:%S")
     loghandler.setFormatter(frm)
     log.addHandler(loghandler)
 

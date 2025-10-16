@@ -14,10 +14,12 @@
     - https_get
     - smtp
     
-    measurements are stored in a timeseries database like influxdb / Amazon Timeseries
-    
+    measurements are stored in a timeseries database like influxdb / Amazon Timeseries    
     This data can be use to graph with Grafana
     
+    Dependencies:
+    - python3-influxdb-client
+
     Created on 7 Aug 2024
     
     @author: Pim van Stam
@@ -91,9 +93,9 @@ def load_measurement(cfg, m_type, ipversion):
                 mc.add_target([target, party])
 
     try:
-        mc.set_socket_dir(cfg["general"]["socket_dir"])
+        mc.set_muxpath(cfg["general"]["mux_interface"])
     except:
-        mc.set_socket_dir("")
+        mc.set_muxpath("")
 
     try:
         m_nodes = cfg["measurements"][m_type46]["nodes"]
@@ -103,11 +105,7 @@ def load_measurement(cfg, m_type, ipversion):
         exctype, excvalue = sys.exc_info()[:2]
         return (None, f"load_measurement - Unhandled exception on nodes: {exctype}: {excvalue}")
     
-    for n in m_nodes:
-        n_path = glob.glob(mc.get_socket_dir() + n + "-*")
-        for np in n_path:
-            mc.add_node(np)
-
+    mc.add_nodes(m_nodes)
     nr_nodes = len(mc.get_nodes())
     if not nr_nodes:
         return(None, f"load_measurement - no nodes available for the measurement {m_type46}.")

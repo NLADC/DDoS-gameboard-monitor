@@ -21,7 +21,7 @@
     - __repr__ and __str__ for representation of the class
     - add_target()  : add a target for this measurement type
     - get_targets() : get list of all defined targets
-    - add_node()    : add measurement node
+    - add_nodes()   : add measurement node(s)
     - get_nodes()   : get list of all nodes for this measurement
     - do()          - execute the measurement
     
@@ -38,12 +38,21 @@ from urllib.parse import urlparse
 
 INTERVAL=20
 
+SAFE_HEADERS = {
+    "Connection": "close",          # no keep-alive reuse/teardown
+    "Accept": "*/*",
+    "Accept-Encoding": "identity",  # no gzip/br, avoid decompression paths
+    "Range": "bytes=0-0",           # fetch 1 byte -> 206 or 200, tiny body
+    "Cache-Control": "no-cache",    # avoid cached intermediates
+}
+
 lookup_nameserver = [] # ['ns1.example.com', ...]
 lookup_httpserver = [] # ['ns1.example.com', ...]
 lookup_targets = {} # {'name': {'ipaddress': ipaddress, 'index': list_index}, 'name' : {}, ...}
 list_targets = []   # ['name', 'name', ...]
 
 tasks = []
+
 
 class Measurement():
     def __init__(self, m_type=None, logger=None, ipversion=4):
@@ -56,7 +65,7 @@ class Measurement():
         self.ipversion = ipversion
         self.m_timeout = 10
         self.m_count = 3
-        self.s_path = "/var/run/remote-controller"
+        self.muxpath = "/run/scamper/mux"
         self.logger = logger
         self.db = None
 #TODO: initialize empty logging for logger==None
@@ -67,11 +76,11 @@ class Measurement():
     def __str__(self):
         return(self.__repr__())
     
-    def set_socket_dir(self, socket_dir):
-        self.s_path = socket_dir
+    def set_muxpath(self, muxpath):
+        self.muxpath = muxpath
 
-    def get_socket_dir(self):
-        return (self.s_path)
+    def get_muxpath(self):
+        return (self.muxpath)
     
     '''
         Add a target to the list of measurement targets.
@@ -89,8 +98,9 @@ class Measurement():
     def get_targets(self):
         return(self.m_targets)
         
-    def add_node(self, node):
-        self.m_nodes.append(node)
+    def add_nodes(self, nodes):
+        for node in nodes:
+            self.m_nodes.append(node)
 
     def get_nodes(self):
         return(self.m_nodes)
@@ -107,8 +117,8 @@ class Measurement():
 #        while(1):
         ts = int(datetime.now(tz=timezone.utc).timestamp())
         # get measurements
-        results = do_measure(self.logger, event_quit, cb_func, result_func, self.ipversion, self.m_targets, self.m_nodes)
-
+        results = do_measure(self.logger, event_quit, cb_func, result_func, self.ipversion, self.m_targets, self.muxpath, self.m_nodes)
+        self.logger.debug(results)
 #TODO: write to database in a thread
         try:
             for target in results.keys():
@@ -117,10 +127,10 @@ class Measurement():
                         party = item[1]
                         break
                 for measurement in results[target]:
-                    self.logger.info(f"do2 - result measurement is {str(measurement)}")
-                    self.logger.info("do2 - write to database")
+                    self.logger.debug(f"do2 - result measurement is {str(measurement)}")
+                    self.logger.debug("do2 - write to database")
                     retval = self.db.write(dbtable, ts, target, party, measurement[0], measurement[1], measurement[2])
-                    self.logger.info("do2 - data written to database")
+                    self.logger.debug("do2 - data written to database")
 
         except AttributeError: # no results received
             self.logger.info("do2 - no results received. Try next measurement")
@@ -356,7 +366,7 @@ def _cbmore_http(ctrl, inst, i_targets):
         inst.done()
     else:
         target = i_targets[inst].pop(0)
-        i_targets['tasks'].append(ctrl.do_http(target[2], target[0], inst=inst, limit_time=10))
+        i_targets['tasks'].append(ctrl.do_http(target[2], target[0], headers=SAFE_HEADERS, inst=inst, limit_time=10))
 
 @staticmethod
 def _cbmore_http_alt(ctrl, inst, i_targets):
@@ -608,20 +618,25 @@ def add_mean_values(m_values):
     i.e.: (('1.2.3.4', 50, 3), ('www.example.com', 10, 4))
         
 '''            
-def do_measure(logger, event_quit, cb_method, result_method, ipversion, targets, nodes):
+def do_measure(logger, event_quit, cb_method, result_method, ipversion, targets, muxpath, nodes):
     retvalues = []
     i_targets = {}
     
-    ctrl = scamper.ScamperCtrl(morecb=cb_method, param=i_targets)
+    ctrl = scamper.ScamperCtrl(morecb=cb_method, param=i_targets, mux=muxpath)
     timestamp_start = datetime.now(tz=timezone.utc).timestamp()
     i_targets['tasks'] = [] # ScamperTask objects of this measurement method
-    for node in nodes:
-        try:
-            inst = ctrl.add_remote(node)
-        except:
-            logger.warning(f"do_measure - cannot add node {node}, perhaps it's lost in the mean time")
+    
+    # load nodes into controller, which creates instances per node
+    vps = [vp for vp in ctrl.vps() if vp.name in nodes]
+    ctrl.add_vps(vps)
+    
+    for inst in ctrl.instances():
         i_targets[inst] = targets.copy()
-
+        
+#        try:
+#            inst = ctrl.add_remote(node)
+#        except:
+#            logger.warning(f"do_measure - cannot add node {node}, perhaps it's lost in the mean time")
 
     while not ctrl.is_done():
         if (event_quit.is_set()):

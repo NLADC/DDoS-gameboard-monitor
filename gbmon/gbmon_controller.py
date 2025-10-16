@@ -38,36 +38,24 @@ import gbcommon
 
 CONFIG_YAML = 'gbm-config.yaml'
 LOOPWAIT = 10
-LOGSTDOUT = 'log/gbmon_stdout.log'
+LOGSTDOUT = '/home/pim/log/gbmon_stdout.log'
 logger = None
 cfg = None
 
 '''
     Get all vps nodes registered at the controller.
-    Remote processes can connect and create a remote socket on the
-    controller of connect to the multiplexed interface. Both methods can be used
-    to find the active remote processes. Only one method will used at a time.
-    mux_interface has preference over socket_dir.
+    Remote processes can connect to the multiplexer interface of the
+    controller. Socket connections are not supported anymore
     
 '''
-def get_allnodes(socket_dir=None, mux_interface=None):
+def get_allnodes(mux_interface=None):
     nodes = []
     
-    if mux_interface == None:
-        if socket_dir != None:
-            arklist = [file for file in glob.glob(f"{socket_dir}/*.ark-*")]
-            for node in arklist:
-                subs1 = node[node.rfind("/")+1:] # get past the last "/" as path divider
-                subs2 = subs1[:subs1.find("ark-")+3]
-                nodes.append(subs2)
-    else:
+    if mux_interface != None:
         with scamper.ScamperCtrl(mux=mux_interface) as ctrl:
             vps = ctrl.vps()          # list[ScamperVp] + metadata (name, cc, tags, ASN, etc.)
             for vp in vps:
-                vp_name = vp.name.split('.')
-                nodes.append(f"{vp_name[0]}.{vp_name[1]}")
-#                print(vp.name, vp.cc, vp.tags)
-
+                nodes.append(vp.name)
     return sorted(nodes)
 
 
@@ -261,24 +249,17 @@ def main():
     else:
         logger.info("API access authenticated")
 
-
-    socket_dir = None
     try:
         mux_interface = cfg["general"]["mux_interface"]
     except:
-        mux_interface = None
-        logger.info("Mux interface not in configuration. Preferred method over socket_dir.")
-        try:
-            socket_dir = cfg["general"]["socket_dir"]
-        except:
-            logger.error("Socket directory not in configuration. Cannot continue.")
-            return 1
-        
-    logger.debug(f"Using multiplex interface: {str(mux_interface)}; socket_dir: {str(socket_dir)}")
+        logger.info("Mux interface not in configuration. Scamper controller not running?")
+        return 1
+    else:
+        logger.debug(f"Using multiplex interface: {str(mux_interface)}")
 
     '''
         Periodic actions are:
-        * retrieve nodelist from Ark and check if there are changes. Put list to Gameboard on changes
+        * retrieve nodelist from controller and check if there are changes. Put list to Gameboard on changes
         * check if ddostest changes. Start/stop gbmon if ddostest is active/inactive 
         * get configuration if ddostest active (is_active and updated_at has changed) changes 
           and store in yaml; reload gbmon
@@ -289,10 +270,9 @@ def main():
             return(1)
 
         '''
-            Step 1: Get nodelist from Ark and PUT list to gameboard on changes
+            Step 1: Get nodelist from controller and PUT list to gameboard on changes
         '''
-        all_nodes = get_allnodes(socket_dir, mux_interface)
-        return 0
+        all_nodes = get_allnodes(mux_interface)
         if all_nodes != prev_nodes:
             logger.info("Node list has changed (or first run). Send list to Gameboard.")
             set_now = set(all_nodes)
@@ -363,8 +343,6 @@ def main():
 
 
 if __name__ == '__main__':
-#    get_allnodes()
-#    exit()
     main()
     gbmon_stop(cfg['general']['pid'])
     
