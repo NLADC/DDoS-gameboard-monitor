@@ -11,6 +11,9 @@
     - get gbmon process ID
     - SIGHUP gbmon process when config has changed
     
+    Dependency:
+    - python3-psutil
+    
     Future development:
     - start / stop gbmon process if there is an active ddos test or has ended
     - check the gbmon process to be alive and restart on crashes
@@ -18,7 +21,7 @@
     
 @author: pim
 @since: 11-09-2024
-@version: 1.0
+@version: 1.1a
 '''
 import sys
 import subprocess
@@ -29,22 +32,30 @@ import glob
 import pathlib
 from urllib.parse import urlparse
 import psutil
+import scamper
 import gbapi
 import gbcommon
 
 CONFIG_YAML = 'gbm-config.yaml'
 LOOPWAIT = 10
-LOGSTDOUT = 'log/gbmon_stdout.log'
+LOGSTDOUT = '/home/pim/log/gbmon_stdout.log'
 logger = None
 cfg = None
 
-def get_allnodes(socket_dir):
+'''
+    Get all vps nodes registered at the controller.
+    Remote processes can connect to the multiplexer interface of the
+    controller. Socket connections are not supported anymore
+    
+'''
+def get_allnodes(mux_interface=None):
     nodes = []
-    arklist = [file for file in glob.glob(f"{socket_dir}/*.ark-*")]
-    for node in arklist:
-        subs1 = node[node.rfind("/")+1:] # get past the last "/" as path divider
-        subs2 = subs1[:subs1.find("ark-")+3]
-        nodes.append(subs2)
+    
+    if mux_interface != None:
+        with scamper.ScamperCtrl(mux=mux_interface) as ctrl:
+            vps = ctrl.vps()          # list[ScamperVp] + metadata (name, cc, tags, ASN, etc.)
+            for vp in vps:
+                nodes.append(vp.name)
     return sorted(nodes)
 
 
@@ -238,16 +249,17 @@ def main():
     else:
         logger.info("API access authenticated")
 
-
     try:
-        socket_dir = cfg["general"]["socket_dir"]
+        mux_interface = cfg["general"]["mux_interface"]
     except:
-        logger.error("Socket directory not in configuration. Cannot continue.")
+        logger.info("Mux interface not in configuration. Scamper controller not running?")
         return 1
+    else:
+        logger.debug(f"Using multiplex interface: {str(mux_interface)}")
 
     '''
         Periodic actions are:
-        * retrieve nodelist from Ark and check if there are changes. Put list to Gameboard on changes
+        * retrieve nodelist from controller and check if there are changes. Put list to Gameboard on changes
         * check if ddostest changes. Start/stop gbmon if ddostest is active/inactive 
         * get configuration if ddostest active (is_active and updated_at has changed) changes 
           and store in yaml; reload gbmon
@@ -258,9 +270,9 @@ def main():
             return(1)
 
         '''
-            Step 1: Get nodelist from Ark and PUT list to gameboard on changes
+            Step 1: Get nodelist from controller and PUT list to gameboard on changes
         '''
-        all_nodes = get_allnodes(socket_dir)
+        all_nodes = get_allnodes(mux_interface)
         if all_nodes != prev_nodes:
             logger.info("Node list has changed (or first run). Send list to Gameboard.")
             set_now = set(all_nodes)
